@@ -1,3 +1,4 @@
+// vim: ts=4:
 /*
  * Copyright (c) 2024 Your Name
  * SPDX-License-Identifier: Apache-2.0
@@ -23,6 +24,9 @@ module tt_um_60hz_load(
 
   // List all unused inputs to prevent warnings
   wire _unused = &{ena, clk, rst_n, 1'b0};
+	
+	logic reset;
+	assign reset = !rst_n;
 
 	logic start;
 	logic [15:0] angle;

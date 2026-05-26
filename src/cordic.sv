@@ -1,3 +1,4 @@
+// vim: ts=4:
 module cordic_sincos_50000_core_20 (
     input  wire              clk,
     input  wire              rst,
@@ -16,7 +17,10 @@ module cordic_sincos_50000_core_20 (
     localparam integer IW = 17;
 
     // atan(2^-i) scaled for -12500..+12500 � -p/2..+p/2
-    localparam signed [15:0] atan_table [0:14] = '{
+
+    logic signed [15:0] atan_table [0:14];
+	initial begin
+		atan_table = '{
         16'sd6250,   // i=0
         16'sd3694,   // i=1
         16'sd1948,   // i=2
@@ -33,10 +37,13 @@ module cordic_sincos_50000_core_20 (
         16'sd1,      // i=13
         16'sd0       // i=14
     };
+	end
 
     // K � 0.607252935 ? 16-bit fixed � 19997, then sign-extend to 19 bits
-    localparam signed [15:0] K16 = 16'sd19997;
-    localparam signed [IW-1:0] K = {{(IW-16){K16[15]}}, K16};
+    logic signed [15:0] K16;
+	initial K16  = 16'sd19997;
+    logic signed [IW-1:0] K;
+	initial K = {{(IW-16){K16[15]}}, K16};
 
     // *** INTERNAL STATE: 19 BITS ***
     reg signed [IW-1:0] x, y, z;
