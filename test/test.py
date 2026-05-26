@@ -25,12 +25,26 @@ async def test_project(dut):
 
     dut._log.info("Test project behavior")
 
-    # Set the input values you want to test
-    dut.ui_in.value = 20
-    dut.uio_in.value = 30
+    # Wait for one full 60Hz cycle
+    await ClockCycles(dut.clk, 50000 * 16)
+    
+    # check time passed
+    assert int(dut.cnt.value) > 790000
+    assert int(dut.cnt.value) < 810000
+    # Check that N & P never intersect
+    assert int(dut.cnt_sin_np.value) == 0
+    assert int(dut.cnt_cos_np.value) == 0
 
-    # Wait for one clock cycle to see the output values
-    await ClockCycles(dut.clk, 10000)
+    # Check that each is approx 1/3 of cnt
+    assert int(dut.cnt_sin_p.value) > 250000
+    assert int(dut.cnt_sin_n.value) > 250000
+    assert int(dut.cnt_cos_p.value) > 250000
+    assert int(dut.cnt_cos_n.value) > 250000
+
+    assert int(dut.cnt_sin_p.value) < 260000
+    assert int(dut.cnt_sin_n.value) < 260000
+    assert int(dut.cnt_cos_p.value) < 260000
+    assert int(dut.cnt_cos_n.value) < 260000
 
     # Keep testing the module by changing the input values, waiting for
     # one or more clock cycles, and asserting the expected output values.

@@ -1,3 +1,4 @@
+// vim: ts=4:
 `default_nettype none
 `timescale 1ns / 1ps
 
@@ -46,4 +47,28 @@ module tb ();
       .rst_n  (rst_n)     // not reset
   );
 
+  // Expand IO for easy wave viewing
+  wire sin_pwm_n, sin_pwm_p;
+  wire cos_pwm_n, cos_pwm_p;
+  assign sin_pwm_p = uo_out[0];
+  assign sin_pwm_n = uo_out[1];
+  assign cos_pwm_p = uo_out[2];
+  assign cos_pwm_n = uo_out[3];
+
+  // add some simple counters for sanity check
+
+  reg  [31:0] cnt;
+  reg  [31:0] cnt_sin_n, cnt_sin_p, cnt_sin_np;
+  reg  [31:0] cnt_cos_n, cnt_cos_p, cnt_cos_np;
+  always @(posedge clk) begin
+	cnt <= (!rst_n)?0:cnt+1;
+	cnt_sin_p <= (!rst_n)?0:(sin_pwm_p )?cnt_sin_p +1:cnt_sin_p;
+	cnt_sin_n <= (!rst_n)?0:(sin_pwm_n )?cnt_sin_n +1:cnt_sin_n;
+	cnt_sin_np<= (!rst_n)?0:(sin_pwm_n &
+							 sin_pwm_p )?cnt_sin_np+1:cnt_sin_np;
+	cnt_cos_p <= (!rst_n)?0:(cos_pwm_p )?cnt_cos_p +1:cnt_cos_p;
+	cnt_cos_n <= (!rst_n)?0:(cos_pwm_n )?cnt_cos_n +1:cnt_cos_n;
+	cnt_cos_np<= (!rst_n)?0:(cos_pwm_n &
+							 cos_pwm_p )?cnt_cos_np+1:cnt_cos_np;
+  end
 endmodule

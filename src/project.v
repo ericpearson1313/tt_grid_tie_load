@@ -95,12 +95,12 @@ module tt_um_60hz_load(
 			cos_pwm_p <= 0;
 			cos_pwm_n <= 0;
 			cos_err <= 0;
-		end else if( valid ) begin
-			sin_pwm_p <= ( sin_err >  16465 * 12 ) ? 1 : ( sin_err < 0 ) ? 0 : sin_pwm_p;
-			sin_pwm_n <= ( sin_err < -16465 * 12 ) ? 1 : ( sin_err > 0 ) ? 0 : sin_pwm_n;
+		end else begin
+			sin_pwm_p <= ( sin_err >  16465 * 12 * 16 ) ? 1 : ( sin_err < 0 ) ? 0 : sin_pwm_p;
+			sin_pwm_n <= ( sin_err < -16465 * 12 * 16 ) ? 1 : ( sin_err > 0 ) ? 0 : sin_pwm_n;
 			sin_err <= sin_err + sin + ((sin_pwm_p)?-16465:(sin_pwm_n)?16465:0);
-			cos_pwm_p <= ( cos_err >  16465 * 12 ) ? 1 : ( cos_err < 0 ) ? 0 : cos_pwm_p;
-			cos_pwm_n <= ( cos_err < -16465 * 12 ) ? 1 : ( cos_err > 0 ) ? 0 : cos_pwm_n;
+			cos_pwm_p <= ( cos_err >  16465 * 12 * 16 ) ? 1 : ( cos_err < 0 ) ? 0 : cos_pwm_p;
+			cos_pwm_n <= ( cos_err < -16465 * 12 * 16 ) ? 1 : ( cos_err > 0 ) ? 0 : cos_pwm_n;
 			cos_err <= cos_err + cos + ((cos_pwm_p)?-16465:(cos_pwm_n)?16465:0);
 		end
  	end
