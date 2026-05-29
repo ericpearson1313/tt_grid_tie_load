@@ -110,54 +110,10 @@ module tt_um_60hz_load(
 	assign uo_out[0] = sin_pwm_p;
 	assign uo_out[1] = sin_pwm_n;
 
-	// Accumulate error over half wave 
-	// quick/dirty
-
+	// rectivy ADC vs Sine difference for our delta
 
 	wire [11:0] delta;
 	assign delta = ( polarity ) ? ad_data - sin[15-:12] : sin[15-:12] - ad_data;
-	reg [31:0] err;
-	always @(posedge clk) begin
-		if( reset ) begin
-			err <= 0;
-		end else begin
-			err <= ( half_cycle ) ? {{20{delta[11]}},delta} : 
-                       ( strobe ) ? {{20{delta[11]}},delta} + err : err;
-		end
-	end
-
-	// Each half cycle update the load duty cycle
-	// if error > thresh, then duty_cycle++, and the opposite
-
-	reg [3:0] duty;
-	always @(posedge clk) 
-		duty <= ( reset ) ? 0 : 
-                ( half_cycle && !err[31] && err[31-:12] != 12'h000 && duty != 15 ) ? duty + 1 :
-                ( half_cycle &&  err[31] && err[31-:12] != 12'hFFF && duty !=  0 ) ? duty - 1 : duty;
-
-    // Use duty cycel to generate load PWM guantee 4us min width
-	// at 48 Mhz,  4 Usec == 192 cyc, or 12 strobve cycles
-	// during a half cycle we have 400K clocks and 25000 strobes
-	// we also have the angle counter from -25000 to 24999 each half cycle
-
-	reg [7:0] outer, inner;
-	reg [3:0] dcount;
-	reg pwm;
-	always @(posedge clk) begin
-		if( reset || half_cycle ) begin
-			outer <= 0;
-			inner <= 0;
-			dcount <= 0;
-			pwm<= 0;
-		end else begin
-			inner <= ( inner == 249 ) ? 0 : inner + 1;
-			dcount<= ( inner == 249 && dcount == 15 ) ? 0 : ( inner == 249 ) ? dcount + 1 : dcount;
-			outer <= ( inner == 249 && dcount == 15 ) ? outer + 1 : outer;
-			pwm <= ( inner == 249 ) ? ((duty>dcount)?1'b1:1'b0) : pwm;
-		end
-	end
-
-	assign uo_out[3] = pwm;
 
 	// Accumdulate the delta error (rectified half wave errot)
 	// Have reasonable hard clamps because it can accumulate forever
@@ -172,12 +128,12 @@ module tt_um_60hz_load(
     	th_sel 		<= ui_in[7:4]; // register inputs
 		thresh    	<= 2'b01 << (7+th_sel); // ranges from 2^7 to 2^22
 		thresh4us	<= 2'b11 << (13+th_sel);// is 192 * thresh
-	end;
+	end
 
 	reg [31:0] fast_acc;
 	wire [31:0] next_acc;
-	assign next_acc = fast_acc + ((gate[1])?{{24{delta[11]}},delta[11:0]}:0) - ((pwm)?thresh:0);
 	reg fast_pwm;
+	assign next_acc = fast_acc + ((gate[1])?{{24{delta[11]}},delta[11:0]}:0) - ((fast_pwm)?thresh:0);
 	always @(posedge clk) begin
 		if( reset ) begin
 			fast_acc <= 0;
@@ -190,6 +146,6 @@ module tt_um_60hz_load(
 		end
 	end
 
-	assign uo_out[4] = fast_pwm;
+	assign uo_out[3] = fast_pwm;
 
 endmodule
