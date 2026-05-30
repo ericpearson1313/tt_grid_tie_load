@@ -8,7 +8,7 @@ project:
   clock_hz:     48000000       # Clock frequency in Hz (or 0 if not applicable)
 
   # How many tiles your design occupies? A single tile is about 340x160 uM.
-  tiles: "1x2"          # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 3x4 or 4x4
+  tiles: "1x1"          # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 3x4 or 4x4
 
   # Your top module name must start with "tt_um_". Make it unique by including your github username:
   top_module:  "tt_um_60hz_load"
@@ -25,20 +25,20 @@ project:
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
 pinout:
   # Inputs
-  ui[0]: "adc_sdata"
-  ui[1]: "gate0_gen"
-  ui[2]: "gate1_dump"
-  ui[3]: "gate2_feedback"
-  ui[4]: "gate3_error"
+  ui[0]: "adc_sdata"        # AC ADC serial data input
+  ui[1]: "gain_sine"        # Pwm in Scales generated 60 Hz sine amplitude
+  ui[2]: "gain_dump"        # Pwm in Scales dump PWM strength (max dump power)
+  ui[3]: "gain_loop"        # Pwm in Scales IIR loop feedback gain (loop stiffness)
+  ui[4]: "gain_error"       # Pwm in Scales fast error accumulation (effective threshold)
   ui[5]: ""
   ui[6]: ""
   ui[7]: ""
 
   # Outputs
-  uo[0]: "adc_cs"
-  uo[1]: "gen_pwm_p"
-  uo[2]: "gen_pwm_n"
-  uo[3]: "dump_pwm"
+  uo[0]: "adc_cs"           # ADC chip-select / sample strobe
+  uo[1]: "grid_pwm_p"       # Grid-former PWM (positive)
+  uo[2]: "grid_pwm_n"       # Grid-former PWM (negative)
+  uo[3]: "dump_pwm"         # DC-link dump FET PWM
   uo[4]: ""
   uo[5]: ""
   uo[6]: ""
