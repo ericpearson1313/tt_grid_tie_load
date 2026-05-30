@@ -49,8 +49,8 @@ module tb ();
 
   // Expand IO for easy wave viewing
   wire sin_pwm_n, sin_pwm_p;
-  assign sin_pwm_p = uo_out[0];
-  assign sin_pwm_n = uo_out[1];
+  assign sin_pwm_p = uo_out[1];
+  assign sin_pwm_n = uo_out[2];
 
   // add some simple counters for sanity check
 

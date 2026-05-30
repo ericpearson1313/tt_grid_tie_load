@@ -135,7 +135,7 @@ module tt_um_60hz_load(
 	// Pseduo energy is the volt error Vin-sin subtractin |ad_data| when pem asserted
 	wire [11:0] delta, deltad, deltae;
 	assign delta = ( polarity ) ? ad_data - sin[15-:12] : sin[15-:12] - ad_data;
-    assign deltad = ( absin_pwm && gate[2] ) ? abs_addata : 0;
+    assign deltad = ( absin_pwm && gate[2] ) ? absad_data : 0;
 	assign deltae = ( gate[3] ) ? delta - deltad : 0;
 
 
@@ -157,6 +157,6 @@ module tt_um_60hz_load(
 
 	// Threhold filterer u;
 
-	assign th_gate == ( !fast_acc[31] && fast_acc[31] > 32'h0010_0000; // can be modulate down
+	assign th_gate = ( !fast_acc[31] && fast_acc[31] > 32'h000F_FFFF ) ? 1'b1 : 1'b0; // can be modulate down
 
 endmodule
