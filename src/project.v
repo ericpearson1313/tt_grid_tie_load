@@ -28,10 +28,12 @@ module tt_um_60hz_load(
 	wire reset;
 	assign reset = !rst_n;
 
-	// Gate input reg
-	reg [3:0] gate;
-	always @(posedge clk) 
-		gate <= ( reset ) ? 0 : ui_in[5:2];
+	// Gate input reg CC crossing meta regs
+	reg [4:0] gate_cc, gate;
+	always @(posedge clk) begin
+		gate_cc <= ui_in[6:2];
+		gate <= gate_cc;
+	end
 
 	// ADC Input
 	wire strobe; // 1 cycle pulse every 16 cycles
@@ -92,6 +94,20 @@ module tt_um_60hz_load(
 		end else if( valid ) begin
 			sin   <= ( polarity ) ? ~cos_out : cos_out; // use cos as it aligns with polarity
 			absin <= cos_out; // since cordic works over -/+pi/2
+		end
+	end
+
+	// gain_vref is gate 4, duty cycle is vrefA
+	reg [20:0] vref_count, vref_sum, vref;
+	always @(posedge clk) begin
+		if( reset ) begin
+			vref_count <=0;
+			vref_sum <= 0;
+			vref <= 0;
+		end else begin
+			vref_count <= vref_count + 1;
+			vref_sum <= ( vref_count == 20'hfffff ) ? gate[4] : vref_sum + gate[4];
+			vref <= ( vref_count == 20'hfffff ) ? vref_sum : vref;
 		end
 	end
 

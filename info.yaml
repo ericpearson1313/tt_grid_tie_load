@@ -31,7 +31,7 @@ pinout:
   ui[3]: "gain_dump"        # Pwm in Scales dump PWM strength (max dump power)
   ui[4]: "gain_loop"        # Pwm in Scales IIR loop feedback gain (loop stiffness)
   ui[5]: "gain_error"       # Pwm in Scales fast error accumulation (effective threshold)
-  ui[6]: ""
+  ui[6]: "gain_vdc"	    # Pwm in Scales DC Vref
   ui[7]: ""
 
   # Outputs
