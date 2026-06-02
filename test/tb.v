@@ -98,3 +98,42 @@ module tb ();
 
 
 endmodule
+
+// external adc sim block
+module lcc_adcsim (
+        // system
+        input logic clk,
+        input logic reset,
+        // ADC simulator connections, parallel in, serial out
+        input logic [3:0][11:0] ad_in,
+        output logic [3:0] ad_out,
+        // driven by sampled falling edge of cs
+        input logic ad_cs
+    );
+
+    logic [19:0] cs_del;
+    always_ff @(posedge clk)
+      if( reset ) begin
+        cs_del <= 0;
+      end else begin
+        cs_del <= { cs_del[18:0], ad_cs };
+      end
+    logic [19:0] cs_trig;
+    assign cs_trig[18:0] =  cs_del[19:0] &~{ cs_del[18:0], ad_cs };
+    logic [3:0][11:0] hold;
+    always_ff @(posedge clk) begin
+      if( reset ) begin
+        hold <= 0;
+      end else begin
+        hold[0] <= ( cs_trig[0] ) ? ( ad_in[0] ^ 12'h800 ) : ( |cs_trig[12-:12] ) ? { hold[0][10:0], 1'b0 } : hold[0];
+        hold[1] <= ( cs_trig[0] ) ? ( ad_in[1] ^ 12'h800 ) : ( |cs_trig[12-:12] ) ? { hold[1][10:0], 1'b0 } : hold[1];
+        hold[2] <= ( cs_trig[0] ) ? ( ad_in[2] ^ 12'h800 ) : ( |cs_trig[12-:12] ) ? { hold[2][10:0], 1'b0 } : hold[2];
+        hold[3] <= ( cs_trig[0] ) ? ( ad_in[3] ^ 12'h800 ) : ( |cs_trig[12-:12] ) ? { hold[3][10:0], 1'b0 } : hold[3];
+      end
+    end
+    assign ad_out[0] = hold[0][11];
+    assign ad_out[1] = hold[1][11];
+    assign ad_out[2] = hold[2][11];
+    assign ad_out[3] = hold[3][11];
+endmodule
+
