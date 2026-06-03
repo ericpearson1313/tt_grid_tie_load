@@ -18,7 +18,7 @@ module cordic_sincos_50000_core_20 (
 
     // atan(2^-i) scaled for -12500..+12500 � -p/2..+p/2
 
-    logic signed [15:0] atan_table [0:14];
+    reg signed [15:0] atan_table [0:14];
 	initial begin
         atan_table[0 ] = 16'sd6250;   // i=0
         atan_table[1 ] = 16'sd3694;   // i=1
@@ -38,9 +38,9 @@ module cordic_sincos_50000_core_20 (
 	end
 
     // K � 0.607252935 ? 16-bit fixed � 19997, then sign-extend to 19 bits
-    logic signed [15:0] K16;
+    reg signed [15:0] K16;
 	initial K16  = 16'sd19997;
-    logic signed [IW-1:0] K;
+    reg signed [IW-1:0] K;
 	initial K = {{(IW-16){K16[15]}}, K16};
 
     // *** INTERNAL STATE: 19 BITS ***
