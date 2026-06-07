@@ -1,6 +1,6 @@
 // vim: ts=4:
 /*
- * Copyright (c) 2024 Your Name
+ * Copyright (c) 2026 Eric Pearson
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -67,37 +67,39 @@ module tt_um_60hz_load(
 	// Count angle every start pulse (-25000 to 24999 )
    	// at 3Mhz (48Mhz/16) this gives us exactly 60 Hz grid freq
 
-	reg polarity, quadrature;
+	reg polarity;
 	always @(posedge clk) begin
 		if( reset ) begin
 			angle <= -12500;
 			polarity <= 0;
-			quadrature <= 0;
 		end else begin
 			if( strobe ) begin
 				angle <= ( angle == 12499 ) ? -12500 : angle + 1;
 		    	polarity <= ( angle == 12499 ) ? ~polarity : polarity;
-				quadrature <= ( angle == 6250 ) ? 0 : ( angle == -6250 ) ? 1 : quadrature;
 			end
 		end
 	end
 
+	// Multiply cos by 3: to nicely fill dynamic range
+	wire signed [16:0] cos3x;
+	assign cos3x = cos_out + ( cos_out << 1 );
+
 	// Correct Polarity (just negate)
-	reg signed [15:0] sin, absin;
+	reg signed [11:0] sin, absin;
 	always @(posedge clk) begin
 		if( reset ) begin
 			sin <= 0;
 			absin <= 0;
 		end else if( valid ) begin
-			sin   <= ( polarity ) ? ~cos_out : cos_out; // use cos as it aligns with polarity
-			absin <= cos_out; // since cordic works over -/+pi/2
+			sin   <= ( polarity ) ? ~cos3x[16-:12] : cos3x[16-:12]; // use cos as it aligns with polarity
+			absin <= cos3x[16-:12] ; // since cordic works over -/+pi/2
 		end
 	end
 
 	// Accumulate error function
 	// and gates PWM outputs with
 	// guaranteed min pulse width of 4us
-	reg signed [31:0] sin_err;
+	reg signed [19:0] sin_err;
 	reg sin_pwm_p, sin_pwm_n;
 
 	always @(posedge clk) begin
@@ -106,9 +108,9 @@ module tt_um_60hz_load(
 			sin_pwm_n <= 0;
 			sin_err <= 0;
 		end else begin
-			sin_pwm_p <= ( sin_err >  16465 * 12 * 16 ) ? 1 : ( sin_err < 0 ) ? 0 : sin_pwm_p;
-			sin_pwm_n <= ( sin_err < -16465 * 12 * 16 ) ? 1 : ( sin_err > 0 ) ? 0 : sin_pwm_n;
-			sin_err <= sin_err + ((gate[0])?sin:0) + ((sin_pwm_p)?-16465:(sin_pwm_n)?16465:0);
+			sin_pwm_p <= ( sin_err >  1544 * 12 * 16 ) ? 1 : ( sin_err < 0 ) ? 0 : sin_pwm_p;
+			sin_pwm_n <= ( sin_err < -1544 * 12 * 16 ) ? 1 : ( sin_err > 0 ) ? 0 : sin_pwm_n;
+			sin_err <= sin_err + ((gate[0])?sin:0) + ((sin_pwm_p)?-1544:(sin_pwm_n)?1544:0);
 		end
  	end
 
@@ -117,7 +119,7 @@ module tt_um_60hz_load(
 
 	// Output PWM based on gated absin.
 
-	reg signed [31:0] absin_err, absin_in;
+	reg signed [19:0] absin_err, absin_in;
 	reg absin_pwm;
 	reg th_gate, dc_th_gate; // U > thresh gate
 	always @(posedge clk) begin
@@ -126,9 +128,9 @@ module tt_um_60hz_load(
 			absin_pwm <= 0;
 			absin_err <= 0;
 		end else begin
-			absin_pwm <= ( absin_err >  16465 * 12 * 16 ) ? 1 : ( absin_err < 0 ) ? 0 : absin_pwm;
+			absin_pwm <= ( absin_err >  1544 * 12 * 16 ) ? 1 : ( absin_err < 0 ) ? 0 : absin_pwm;
 			absin_in  <= (gate[1]&&(th_gate|dc_th_gate))?absin:0;
-			absin_err <= absin_err + absin_in - ((absin_pwm)?16465:0);
+			absin_err <= absin_err + absin_in - ((absin_pwm)?1544:0);
 		end
  	end
 
@@ -139,25 +141,23 @@ module tt_um_60hz_load(
 	/////////////
 
 	// Pseduo energy is the voltage error from leading AC, ie phase error from generator energy
-	reg [11:0] delta, deltad, deltae;
+	reg signed [11:0] delta;
 	always @(posedge clk) begin
-		delta  <= ( quadrature ) ? sin[15-:12] - ac_data :  ac_data - sin[15-:12];
-    	deltad <= ( absin_pwm && gate[2] ) ? absin : 0;
-		deltae <= ( gate[3] ) ? delta - deltad : 0;
+		delta  <= ( gate[2] ) ? ac_data - sin : 0;
 	end
 
 
 	// Accumdulate the delta error 'u' 
 	// Have reasonable hard clamps because it can accumulate forever
-	reg [31:0] fast_acc;
-	wire [31:0] next_acc;
-	assign next_acc = fast_acc + {{20{deltae[11]}},deltae[11:0]};
+	reg signed [25:0] fast_acc;
+	wire signed [25:0] next_acc;
+	assign next_acc = fast_acc + delta - (( fast_acc > 26'h00FFFFF ) ? absin : 0 );
 	always @(posedge clk) begin
 		if( reset ) begin
 			fast_acc <= 0;
 		end else begin
-			fast_acc <= ( next_acc[31:30] == 2'b01 ) ? 32'h3FFF_FFFF :
-                       	( next_acc[31:30] == 2'b10 ) ? 32'hC000_0000 : next_acc;
+			fast_acc <= ( next_acc[25:24] == 2'b01 ) ? 26'h1FFFFFF :
+                       	( next_acc[25:24] == 2'b10 ) ? 26'h2000000 : next_acc;
 		end
 	end
 
@@ -165,46 +165,29 @@ module tt_um_60hz_load(
 
 	// Threhold filterer u;
 	always @(posedge clk)
-		th_gate <= ( !fast_acc[31] && fast_acc > 32'h000F_FFFF ) ? 1'b1 : 1'b0; // can be modulate down
+		th_gate <= ( !fast_acc[25] && fast_acc > 26'h00FFFFF ) ? 1'b1 : 1'b0; // can be modulate down
 
 	/////////////
 	//	DC Loop
 	/////////////
 
-	// gain_vref is gate 4, duty cycle is Vref DC
-	reg [20:0] vref_count, vref_sum, vref;
-	always @(posedge clk) begin
-		if( reset ) begin
-			vref_count <=0;
-			vref_sum <= 0;
-			vref <= 0;
-		end else begin
-			vref_count <= vref_count + 1;
-			vref_sum <= ( vref_count == 20'hfffff ) ? gate[4] : vref_sum + gate[4];
-			vref <= ( vref_count == 20'hfffff ) ? vref_sum : vref;
-		end
-	end
-
 	// Pseduo energy is the voltage error from Vref DC
-	reg [11:0] dc_delta, dc_deltad, dc_deltae;
+	reg signed [30:0] dc_delta;
 	always @(posedge clk) begin
-		dc_delta  <= dc_data - vref[19-:12];
-    	dc_deltad <= ( absin_pwm && gate[2] ) ? absin : 0;
-		dc_deltae <= ( gate[3] ) ? dc_delta - dc_deltad : 0;
+		dc_delta  <= ( gate[3] ) ? dc_data - (( gate[4] ) ? 12'h800 : 0 ) : 0;; 
 	end
-
 
 	// Accumdulate the delta error 'u' 
 	// Have reasonable hard clamps because it can accumulate forever
-	reg [31:0] dc_fast_acc;
-	wire [31:0] dc_next_acc;
-	assign dc_next_acc = dc_fast_acc + {{20{dc_deltae[11]}},dc_deltae[11:0]};
+	reg signed [30:0] dc_fast_acc;
+	wire signed [30:0] dc_next_acc;
+	assign dc_next_acc = dc_fast_acc + dc_delta - (( dc_fast_acc > 31'h00FF_FFFF ) ? absin : 0 );
 	always @(posedge clk) begin
 		if( reset ) begin
 			dc_fast_acc <= 0;
 		end else begin
-			dc_fast_acc <= ( dc_next_acc[31:30] == 2'b01 ) ? 32'h3FFF_FFFF :
-                       	   ( dc_next_acc[31:30] == 2'b10 ) ? 32'hC000_0000 : dc_next_acc;
+			dc_fast_acc <= ( dc_next_acc[30:29] == 2'b01 ) ? 31'h1FFF_FFFF :
+                       	   ( dc_next_acc[30:29] == 2'b10 ) ? 31'h6000_0000 : dc_next_acc;
 		end
 	end
 
@@ -213,6 +196,6 @@ module tt_um_60hz_load(
 	// Threhold filterer u;
 
 	always @(posedge clk)
-		dc_th_gate <= ( !dc_fast_acc[31] && dc_fast_acc > 32'h000F_FFFF ) ? 1'b1 : 1'b0; 
+		dc_th_gate <= ( !dc_fast_acc[30] && dc_fast_acc > 31'h00FF_FFFF ) ? 1'b1 : 1'b0; 
 
 endmodule

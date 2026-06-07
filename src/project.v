@@ -1,6 +1,6 @@
 // vim: ts=4:
 /*
- * Copyright (c) 2024 Your Name
+ * Copyright (c) 2026 Eric Pearson
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -165,7 +165,7 @@ module tt_um_60hz_load(
 
 	// Threhold filterer u;
 	always @(posedge clk)
-		th_gate <= ( !fast_acc[31] && fast_acc > 26'h00FFFFF ) ? 1'b1 : 1'b0; // can be modulate down
+		th_gate <= ( !fast_acc[25] && fast_acc > 26'h00FFFFF ) ? 1'b1 : 1'b0; // can be modulate down
 
 	/////////////
 	//	DC Loop
@@ -179,8 +179,8 @@ module tt_um_60hz_load(
 
 	// Accumdulate the delta error 'u' 
 	// Have reasonable hard clamps because it can accumulate forever
-	reg signed [31:0] dc_fast_acc;
-	wire signed [31:0] dc_next_acc;
+	reg signed [30:0] dc_fast_acc;
+	wire signed [30:0] dc_next_acc;
 	assign dc_next_acc = dc_fast_acc + dc_delta - (( dc_fast_acc > 31'h00FF_FFFF ) ? absin : 0 );
 	always @(posedge clk) begin
 		if( reset ) begin
