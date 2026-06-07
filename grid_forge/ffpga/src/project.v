@@ -142,8 +142,9 @@ module tt_um_60hz_load(
 
 	// Pseduo energy is the voltage error from leading AC, ie phase error from generator energy
 	reg signed [11:0] delta;
+	wire dc_very_low;
 	always @(posedge clk) begin
-		delta  <= ( gate[2] ) ? ac_data - sin : 0;
+		delta  <= ( gate[2] && !dc_very_low ) ? ac_data - sin : 0;
 	end
 
 
@@ -188,6 +189,8 @@ module tt_um_60hz_load(
 			dc_fast_acc <= ( dc_next_acc[30] != dc_next_acc[29] ) ? {dc_next_acc[30], {30{~dc_next_acc[30]}}} : dc_next_acc;
 		end
 	end
+
+	assign dc_very_low = dc_fast_acc[30] & !dc_fast_acc[28];
 
 	// Low pass filter u : TBD
 
