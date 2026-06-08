@@ -158,16 +158,16 @@ cos_rom[31] = 9'd0;
 `endif // ROM not CORDIC
 	
 	// Correct Polarity (just negate)
-	reg signed [11:0] sin, absin;
+	reg signed [11:0] sin;
 	always @(posedge clk) begin
 		if( reset ) begin
 			sin <= 0;
-			absin <= 0;
 		end else if( valid ) begin
 			sin   <= ( polarity ) ? ~cos3x : cos3x; // use cos as it aligns with polarity
-			absin <= cos3x; // since cordic works over -/+pi/2
 		end
 	end
+	wire signed [11:0] absin;
+	assign absin = cos3x;
 
 	// Accumulate error function
 	// and gates PWM outputs with
