@@ -213,10 +213,8 @@ cos_rom[31] = 9'dx;
 	// Pseduo energy is the voltage error from leading AC, ie phase error from generator energy
 	reg signed [11:0] delta;
 	wire dc_very_low;
-	always @(posedge clk) begin
+	always @(posedge clk) 
 		delta  <= ( gate[2] && !dc_very_low ) ? ac_data - sin : 0;
-	end
-
 
 	// Accumdulate the delta error 'u' 
 	// Have reasonable hard clamps because it can accumulate forever
@@ -242,8 +240,9 @@ cos_rom[31] = 9'dx;
 	/////////////
 
 	// Pseduo energy is the voltage error from Vref DC
-	wire signed [11:0] dc_delta;
-	assign	dc_delta  = ( !gate[3] ) ? 0 : { gate[4] ^ dc_data[11], dc_data[10:0] };
+	reg signed [11:0] dc_delta;
+	always @(posedge clk)
+		dc_delta  <= ( !gate[3] ) ? 0 : { gate[4] ^ dc_data[11], dc_data[10:0] };
 
 	// Accumdulate the delta error 'u' 
 	// Have reasonable hard clamps because it can accumulate forever
