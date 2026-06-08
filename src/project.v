@@ -143,13 +143,13 @@ cos_rom[21] = 9'd72;
 cos_rom[22] = 9'd47;
 cos_rom[23] = 9'd22;
 cos_rom[24] = 9'd0;
-cos_rom[25] = 9'd0;
-cos_rom[26] = 9'd0;
-cos_rom[27] = 9'd0;
-cos_rom[28] = 9'd0;
-cos_rom[29] = 9'd0;
-cos_rom[30] = 9'd0;
-cos_rom[31] = 9'd0;
+cos_rom[25] = 9'dx;
+cos_rom[26] = 9'dx;
+cos_rom[27] = 9'dx;
+cos_rom[28] = 9'dx;
+cos_rom[29] = 9'dx;
+cos_rom[30] = 9'dx;
+cos_rom[31] = 9'dx;
 	end
     assign valid = 1;
 	wire [8:0] read;
@@ -158,16 +158,13 @@ cos_rom[31] = 9'd0;
 `endif // ROM not CORDIC
 	
 	// Correct Polarity (just negate)
-	reg signed [11:0] sin;
+	reg signed [11:0] sin, absin;
 	always @(posedge clk) begin
-		if( reset ) begin
-			sin <= 0;
-		end else if( valid ) begin
+		if( valid ) begin
 			sin   <= ( polarity ) ? ~cos3x : cos3x; // use cos as it aligns with polarity
+			absin <= cos3x;
 		end
 	end
-	wire signed [11:0] absin;
-	assign absin = cos3x;
 
 	// Accumulate error function
 	// and gates PWM outputs with
