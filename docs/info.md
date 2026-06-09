@@ -3,7 +3,7 @@
 
 This ASIC implements a **self‑contained, grid‑aware control loop** capable of generating a clean 60 Hz reference waveform while simultaneously regulating real‑power flow using a **DC‑link dump load**. It is designed for small AC micro‑systems where PV inverters, a low‑power grid‑former, and a resistive dump load must coexist without external controllers.
 
-The chip senses the AC waveform, compares it to an internal CORDIC‑generated reference, and adjusts a DC‑side dump FET to maintain long‑term phase and amplitude stability. All control is performed on‑chip using add/shift arithmetic, a fast error accumulator, a slow IIR loop, and a minimum‑pulse‑width PWM engine.
+The chip senses the AC and DC waveforms, compares DC to a Vref and AC to an internal CORDIC‑generated reference, and adjusts a DC‑side dump FET to maintain long‑term phase and amplitude stability. All control is performed on‑chip using add/shift arithmetic, a fast error accumulator, a slow IIR loop, and a minimum‑pulse‑width PWM engine.
 
 ---
 
@@ -12,21 +12,23 @@ The chip senses the AC waveform, compares it to an internal CORDIC‑generated r
 - **CORDIC‑locked 60 Hz sine generator**  
   Produces a stable, phase‑accurate reference for a low‑power H‑bridge grid‑former.
 
-- **AC‑side sensing (single ADC input)**  
-  Samples the AC waveform at 3 MHz and compares it to the internal reference.
+- **AC/DC sensing (dual ADC input)**  
+  Samples the AC and DC waveforms at 3 MHz and compares it to the internal reference.
 
-- **Fast error accumulator + slow IIR controller**  
-  Forms a linear, stable control loop without multipliers.
+- **AC/DC Dual Loop control**  
+  Forms linear and stable control loops without multipliers.
 
 - **DC‑link dump‑load PWM output**  
   Drives a single high‑voltage FET with enforced **4 µs minimum ON/OFF** times.
 
 - **Four real‑time tuning gates**  
   External PWM or logic‑level inputs adjust loop behavior on the fly:
+  - `dc_vref` — DC Link Reference voltage input  
   - `gain_sine` — trims generated sine amplitude  
-  - `gain_dump` — limits dump‑PWM strength (max dump power)  
-  - `gain_loop` — adjusts IIR loop gain (loop stiffness)  
-  - `gain_error` — scales fast error accumulation (effective threshold)
+  - `gain_out` — Output gain trim  
+  - `gain_ac` — AC gain  
+  - `gain_dc` — DC gain 
+  - `mode_ac` — select 1/4 cycle AC operation 
 
 - **Safe, simple power topology**  
   Intended for use with a **rectified 240 V AC DC‑link** (VFD‑style front end) and a resistive dump load such as a water heater.
@@ -37,14 +39,15 @@ The chip senses the AC waveform, compares it to an internal CORDIC‑generated r
 
 ### **Inputs (`ui`)**
 ```
-ui[0]  adc_sdata       # AC ADC serial data input (3 MHz sample stream)
-ui[1]  gain_sine       # Sine amplitude trim (generation gain)
-ui[2]  gain_dump       # Dump-PWM gain trim (max dump power)
-ui[3]  gain_loop       # IIR loop feedback gain trim (loop stiffness)
-ui[4]  error_error     # Error accumulation trim (effective threshold)
-ui[5]  (unused)
-ui[6]  (unused)
-ui[7]  (unused)
+ui[0]  ac_sdata      # AC ADC serial data input (3 MHz sample stream)
+ui[1]  dc_sdata      # DC ADC serial data input (3 MHz sample stream)
+ui[2]  dc_vref       # DC Vref target voltage for DC Link
+ui[3]  gain_sine     # Sine amplitude trim (generation gain)
+ui[4]  gain_out      # Dump-PWM gain trim (max dump power)
+ui[5]  gain_ac       # AC Gain trim
+ui[6]  error_dc      # DC Gain trim
+ui[7]  ac_mode       # Select 1/4 cycle ac mode
+
 ```
 
 ### **Outputs (`uo`)**
@@ -77,10 +80,10 @@ The chip maintains long‑term phase and amplitude alignment by modulating the d
 
 ## **Status**
 
+- [Preliminary Datasheet](GPC-01_Datasheet.pdf) 
 - RTL complete  
 - Clean synthesis  
 - Verified P&R on **1×2 tile**  
-- ~87.5% utilization on 1×1 → **1×2 chosen**  
 - Ready for TinyTapeout submission  
 - verification pending
 - validation pending
@@ -94,23 +97,19 @@ If the energy is not dissipated the voltage and frequiency of the simulated grid
 
 The energy from the sun needs to be always and exactly dissipated. This dissipation can be partially done by any electrical devices in the home, but something else needs dissipate the remainder. Heating water is a good way of dumping energy.
 
-A device is proposed which will generate a reference 60Hz AC, and control dumping extra energy into a resistive load without needed a battery system.
+A semiconductor chip is proposed which will generate a reference 60Hz AC, and control dumping extra energy into a resistive load without needed a battery system (ref [Datasheet](GPC-01_Datasheet.pdf) ). I design up a minimum usable Schematic and PCB board (kicad files in /pcb).
 
 Its a good fit for a tiny tapeout chip with low I/O count PWM and serial data, and 20ns PWM edge resolution
-gives fine control, while maintaiing minimum pulse widths. 
+gives fine control, while maintaiing minimum pulse widths. It also fits a forge 1k otp part.
 
-Fitting this device into a tiny tapeout would remove all cost from the control part of the problem.
+Fitting this device into a tiny cost would remove all cost from the control part of the problem. Mounted on a little experimental PCB board it would be a $30 control solution.
 
 ## How it works
 
 A free running angle counter is input into a cordic rotational block and polarity corrected to calculate a 60Hz sine wave.
-The sine wave is gated and then accumulated in PWM modulator produce bi-polar PWM signals which can be used to drive an H Bridge and
-the low side of a transformer, with the high side providing the grid reference.
-
-The AC 'grid' voltage is sampled by ADC. A psuedo energy error is calculated by accumulating the delta between ADC data and calculated sine, 
-PLUS the gated PWM gating -|ADC| when energy is dumped into a load resistance (water heater). The accumulated energy error is low pass filtered and compared against a positive threshold and used along with an external gate to gate |sin| and accumulate to produce a PWM signal to drive the dump switch (fet).
-
-The I/O is minimal with 2 I/O for the ADC, 3 pwm outputs and 4 pwm (gain control) inputs.  Total of 5 inputs and 3 outputs and a 48Mhz clock and rest signal.
+The sine wave is gated and then accumulated in PWM modulator produce bi-polar PWM signals which can be used to drive an H Bridge and the low side of a transformer, with the high side providing the grid reference.
+The 'grid' is rectified into a DC Link, with PWM switching into a resistive load.
+The DC and AC 'grid' voltages are sampled by ADC. AC is compared to the sine wave while DC is compared to a PWM provided DC Vref. AC and DC Loops accumulate the pseudo-energy error, compared against a positive thresholds and used to gate |sin| to drive a dump FET while guaranteeing minimum PWM pulse widths (4us).
 
 ## How to test
 
@@ -118,7 +117,7 @@ Tests I used to bring up the RTL with.
 
 ## External hardware
 
-It will need a real or simulated (fpga) system to test:
+It will need a real or model system to test:
 
     -Grid-tied solar system, sunlight
     -Hbridge and drivers
