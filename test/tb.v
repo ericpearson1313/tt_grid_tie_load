@@ -113,7 +113,6 @@ module tb ();
 
 	// Otherwise this feeds the 
     reg signed [15:0] angle;
-	reg polarity;
     wire [15:0] sin_out, cos_out;
     wire valid, busy;
 	wire [11:0] cos3x;
@@ -121,10 +120,8 @@ module tb ();
 	always @(posedge clk) begin
 		if( !rst_n ) begin
 			angle <= -12500;
-			polarity <= 0;
 		end else if ( cs_ireg ) begin
 			angle <= ( angle == 12499 ) ? -12500 : angle + 1;
-			polarity <= ( angle == 12499 ) ? !polarity : polarity;
 		end
 	end
 
@@ -133,6 +130,15 @@ module tb ();
 
 	assign angle_ofs = angle + phase_lead;
 	assign angle_new = ( angle_ofs > 12499 ) ? angle_ofs - 25000 : angle_ofs;
+
+	reg polarity;
+	always @(posedge clk) begin
+		if( !rst_n ) begin
+			polarity <= 0;
+		end else if ( cs_ireg ) begin
+			polarity <= ( angle_new == 12499 ) ? !polarity : polarity;
+		end
+	end
 
     cordic_sincos_50000_core_20 i_tb_sin(
         .clk( clk ),
@@ -145,9 +151,9 @@ module tb ();
         .busy( )
     );
 
-	wire [11:0] cos_pol;
+	wire [15:0] cos_pol;
 	assign cos_pol = ( polarity ) ? ~cos_out : cos_out;
-	assign cos3x = cos_out[15-:12] + { cos_out[15], cos_out[15-:11] };
+	assign cos3x = cos_pol[15-:12] + { cos_pol[15], cos_pol[15-:11] };
 
 	assign vac = cos3x;
 
