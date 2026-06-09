@@ -21,19 +21,19 @@ async def test_project(dut):
     dut.rst_n.value = 0
 
     # dut controls
-    dut.vac.value = 0;
-    dut.vdc.value = 1000;
     dut.ac_mode.value = 1
-    dut.num_vref.value = 240
+    dut.num_vref.value = 200
     dut.den_vref.value = 400
     dut.num_sine.value = 99
     dut.den_sine.value = 100
     dut.num_out.value = 99
     dut.den_out.value = 100
-    dut.num_ac.value = 7
+    dut.num_ac.value = 9
     dut.den_ac.value = 11
     dut.num_dc.value = 998
     dut.den_dc.value = 1000
+    dut.phase_lead.value = 1000
+    dut.vdc.value = 2000
     
     await ClockCycles(dut.clk, 10)
     dut.rst_n.value = 1

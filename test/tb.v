@@ -5,6 +5,11 @@
 /* This testbench just instantiates the module and makes some convenient wires
    that can be driven / tested by the cocotb test.py.
 */
+// for gate level tests we need a local cordic
+`ifdef GL_TEST
+`include "cordic.sv"
+`endif
+
 module tb ();
 
   // Dump the signals to a FST file. You can view it with gtkwave or surfer.
@@ -98,6 +103,54 @@ module tb ();
         adc_vdc <= m_ad_out[1];
       end
     end
+
+	//////////////////////
+    // Cordic to drive AC
+	//////////////////////
+
+	// Driven by testbench
+	wire [15:0] phase_lead; // 50000 steps per cycle, typical 1000 = 2% lead
+
+	// Otherwise this feeds the 
+    reg signed [15:0] angle;
+	reg polarity;
+    wire [15:0] sin_out, cos_out;
+    wire valid, busy;
+	wire [11:0] cos3x;
+
+	always @(posedge clk) begin
+		if( !rst_n ) begin
+			angle <= -12500;
+			polarity <= 0;
+		end else if ( cs_ireg ) begin
+			angle <= ( angle == 12499 ) ? -12500 : angle + 1;
+			polarity <= ( angle == 12499 ) ? !polarity : polarity;
+		end
+	end
+
+    wire signed [15:0] angle_ofs;
+    wire signed [15:0] angle_new;
+
+	assign angle_ofs = angle + phase_lead;
+	assign angle_new = ( angle_ofs > 12499 ) ? angle_ofs - 25000 : angle_ofs;
+
+    cordic_sincos_50000_core_20 i_tb_sin(
+        .clk( clk ),
+        .rst( !rst_n ),
+        .start( cs_ireg ),
+        .angle_in( angle_new ),
+        .sin_out ( ),
+        .cos_out ( cos_out ),
+        .valid( ),
+        .busy( )
+    );
+
+	wire [11:0] cos_pol;
+	assign cos_pol = ( polarity ) ? ~cos_out : cos_out;
+	assign cos3x = cos_out[15-:12] + { cos_out[15], cos_out[15-:11] };
+
+	assign vac = cos3x;
+
 
 	//////////////////////
     // PWM Generators
