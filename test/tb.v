@@ -136,7 +136,7 @@ module tb ();
 		if( !rst_n ) begin
 			polarity <= 0;
 		end else if ( cs_ireg ) begin
-			polarity <= ( angle_new >= 12499 ) ? !polarity : polarity;
+			polarity <= ( angle_new == 12499 ) ? !polarity : polarity;
 		end
 	end
 
@@ -177,7 +177,7 @@ module tb ();
 	recip_pwm #( 16 ) i_pwm2 ( clk, !rst_n, num_out , den_out , pwm_out  );
 	recip_pwm #( 16 ) i_pwm3 ( clk, !rst_n, num_ac  , den_ac  , pwm_ac   );
 	recip_pwm #( 16 ) i_pwm4 ( clk, !rst_n, num_dc  , den_dc  , pwm_dc   );
-	assign in_pwm[5:0] = { ac_mode, pwm_vref, pwm_sine, pwm_out, pwm_ac, pwm_dc };
+	assign in_pwm[5:0] = { ac_mode, pwm_vref, pwm_dc, pwm_ac, pwm_out, pwm_sine };
 
 	
 	//////////////////////
@@ -221,15 +221,16 @@ module tb ();
 			pdump = 0.0;	
 		    lead = 0.0;
 		end else begin
-			pdump <= ( !pwm ) ? 0.0 : 1.0 * vcap * vcap / R;
-			ecap  <= ecap + (( pgrid - pdump ) / F);
-			vcap  <= $sqrt( 2000000.0 * ecap / C );
-			lead <= ( vcap - vref ) * 90.0 / 400.0;
+			pdump = ( !pwm ) ? 0.0 : 1.0 * vcap * vcap / R;
+			ecap  = ecap + (( pgrid - pdump ) / F);
+			ecap = ( ecap < 0.0 ) ? 0.0 : ecap; // no negative energy
+			vcap  = $sqrt( 2000000.0 * ecap / C );
+			lead  = ( vcap - vref ) * 90.0 / 400.0;
 		end
 	end
 			
 	// Scaled model outputs:
-	assign vdc[11:0] = ( vcap * 1744.0 / 340.0 ); 
+	assign vdc[11:0] = ( vcap > 399.0 ) ? ( 399.0 * 1744.0 / 340.0 ) : ( vcap * 1744.0 / 340.0 ); 
 	assign phase_lead = ( lead * 12500.0 / 90.0 );
 	assign num_vref = vref*10.0;
 	assign den_vref = 4000;
