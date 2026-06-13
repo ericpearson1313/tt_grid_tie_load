@@ -6,10 +6,9 @@ This ASIC implements a **self‑contained, grid‑aware control loop** capable o
 
 The chip senses the AC and DC waveforms, compares DC to a Vref and AC to an internal CORDIC‑generated reference, and adjusts a DC‑side dump FET to maintain long‑term phase and amplitude stability. All control is performed on‑chip using add/shift arithmetic, a fast error accumulator, a slow IIR loop, and a minimum‑pulse‑width PWM engine.
 
-!\[Block Diagram](block\_diagram.png)
+![Block Diagram](block_diagram.png)
 
 \---
-
 ## **Core Features**
 
 * **CORDIC‑locked 60 Hz sine generator**  
@@ -32,11 +31,7 @@ External PWM or logic‑level inputs adjust loop behavior on the fly:
 * **Safe, simple power topology**  
 Intended for use with a **rectified 240 V AC DC‑link** (VFD‑style front end) and a resistive dump load such as a water heater.
 
-
-
-!{System Diagram](system\_diagram.png)
-
-
+![System Diagram](system_diagram.png)
 
 \---
 
@@ -95,11 +90,7 @@ The chip maintains long‑term phase and amplitude alignment by modulating the d
 * verification pending
 * validation pending
 
-
-
-!\[Development Board](dev\_board.png)
-
-
+![Development Board](dev_board.png)
 
 ## Why is it?
 
