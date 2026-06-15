@@ -123,17 +123,30 @@ module grid_tie_chip
   wire [7:0] uio_oe;
   wire [7:0] uo_out;
 
+  // Fpga probes
 
+	wire dc_thresh;
+	wire ac_thresh;
+	wire signed [11:0] ac_acc;	
+	wire signed [11:0] dc_acc;	
+	
+	
   // TT Grid Tie Chip under test
   tt_um_60hz_load user_project (
-      .ui_in  (ui_in),    // Dedicated inputs
+		// system
+      .clk    (clk),      // clock
+      .rst_n  (!reset),     // not reset      .ui_in  (ui_in),    // Dedicated inputs
+		// Tiny Tapeout IO
       .uo_out (uo_out),   // Dedicated outputs
       .uio_in (uio_in),   // IOs: Input path
       .uio_out(uio_out),  // IOs: Output path
       .uio_oe (uio_oe),   // IOs: Enable path (active high: 0=input, 1=output)
       .ena    ( 1'b1 ),      // enable - goes high when design is selected
-      .clk    (clk),      // clock
-      .rst_n  (!reset)     // not reset
+		// FPGA only white box probes
+		.dc_thresh	( dc_thresh	 ),
+		.ac_thresh	( ac_thresh	 ),
+		.ac_acc		( ac_acc		 ),
+		.dc_acc		( dc_acc		 )
   );
   
   // Expand Inputs and outputs to named signals
@@ -208,23 +221,6 @@ module grid_tie_chip
 	assign num_vref =  vref;
 	assign den_vref =  2048;	
 	
-	// and the 6 adc pins, expanded to 12 bit adc channels
-	logic [11:0] mad_a0, mad_a1, mad_b0, mad_b1, iest;
-	logic mad_strobe;	
-	
-
-	// monitor LCC digital I/O pins
-	logic [7:0] lcc_mon;
-	assign lcc_mon = { 
-							pwm_sin_p, // can put burn here
-							pwm_sin_n,
-							pwm_dump ,
-							pwm_vref ,
-							gain_sin ,
-							gain_out ,
-							gain_ac  , 
-							gain_dc  };	
-							
 	// Simualte an external ADC
 	logic signed [11:0] vdc, vac;
 	logic [1:0] unused;
@@ -238,6 +234,32 @@ module grid_tie_chip
 		// simualted ADC Data for Tester
 		.ad_in( { 12'h000, 12'h000, vac, vdc })
 	);	
+
+	// Connect up to capture buffer(S) and HDMI Display
+
+	// monitor LCC digital I/O pins
+	logic [7:0] lcc_mon;
+	assign lcc_mon = { 
+							dc_thresh, 
+							ac_thresh,
+							pwm_dump ,
+							pwm_vref ,
+							gain_sin ,
+							gain_out ,
+							gain_ac  , 
+							gain_dc  };	
+							
+		// and the 6 adc pins, expanded to 12 bit adc channels
+	logic [11:0] mad_a0, mad_a1, mad_b0, mad_b1, iest;
+	logic mad_strobe;	
+	
+	assign mad_strobe = adc_cs;
+	assign mad_a0 = 12'h7ff ^ vac;
+	assign mad_a1 = 12'h7ff ^ vdc;
+	assign mad_b0 = 12'h7ff ^ ac_acc;
+	assign mad_b1 = 12'h7ff ^ dc_acc;
+	assign iest   = 12'h7ff ^ vref;
+							
 
 	//////////////////////
     // Cordic to drive AC
@@ -797,67 +819,67 @@ module grid_tie_chip
 	// 4ch Oscilloscope mem & vga display
 	logic [7:0] tiny_red, tiny_green, tiny_blue;
 	logic tiny;
-	tiny_scope #( 
-		.V_HEIGHT( 192 ), // 96 or 192 options
-		.V_START ( 80  ),
-		.H_START	( 529 ),
-		.H_END 	( 784 ),
-		.N       ( 2   ), // 60 Hz frames per col pel
-		.GD_COLOR( 24'h32006a /* smpte_deep_violet */ ), 
-		.BG_COLOR( 24'h00214c /* smpte_oxford_blue */ ) //24'h1d1d1d /* smpte_eerie_black */ )	
-	 ) _tiny_scope(
-		.clk(   hdmi_clk ),
-		.reset( reset ),
-		// video sync 
-		.blank( blank ), 
-		.hsync( hsync ),
-		.vsync( vsync ),
-		// scroll halt input
-		.halt ( mscroll_halt ),
-		// capture inputs
-		.ad_a0( mad_a0 ),
-		.ad_a1( mad_a1 ),
-		.ad_b0( mad_b0 ),
-		.ad_b1( mad_b1 ),
-		.ad_strobe( mad_strobe ),
-		.ad_clk( clk ),
-		// video output
-		.red(   tiny_red ),
-		.green( tiny_green ),
-		.blue(  tiny_blue )
-	);
+	//tiny_scope #( 
+	//	.V_HEIGHT( 192 ), // 96 or 192 options
+	//	.V_START ( 80  ),
+	//	.H_START	( 529 ),
+	//	.H_END 	( 784 ),
+	//	.N       ( 2   ), // 60 Hz frames per col pel
+	//	.GD_COLOR( 24'h32006a /* smpte_deep_violet */ ), 
+	//	.BG_COLOR( 24'h00214c /* smpte_oxford_blue */ ) //24'h1d1d1d /* smpte_eerie_black */ )	
+	// ) _tiny_scope(
+	//	.clk(   hdmi_clk ),
+	//	.reset( reset ),
+	//	// video sync 
+	//	.blank( blank ), 
+	//	.hsync( hsync ),
+	//	.vsync( vsync ),
+	//	// scroll halt input
+	//	.halt ( mscroll_halt ),
+	//	// capture inputs
+	//	.ad_a0( mad_a0 ),
+	//	.ad_a1( mad_a1 ),
+	//	.ad_b0( mad_b0 ),
+	//	.ad_b1( mad_b1 ),
+	//	.ad_strobe( mad_strobe ),
+	//	.ad_clk( clk ),
+	//	// video output
+	//	.red(   tiny_red ),
+	//	.green( tiny_green ),
+	//	.blue(  tiny_blue )
+	//);
 	assign tiny = |{ tiny_red, tiny_green, tiny_blue };
 
 	// 8ch digital logic analyser mem & vga display
 	logic [7:0] tinyb_red, tinyb_green, tinyb_blue;
 	logic tinyb;
-	tiny_binary_scope #( 
-		.V_HEIGHT( 64 ), // 96 or 192 options
-		.V_START ( 400  ),
-		.H_START	( 529 ),
-		.H_END 	( 784 ),
-		.N       ( 2   ), // 60 Hz frames per col pel
-		.GD_COLOR( 24'h32006a /* smpte_deep_violet */ ), 
-		.BG_COLOR( 24'h00214c /* smpte_oxford_blue */ ) //24'h1d1d1d /* smpte_eerie_black */ )	
-	 ) _tinyb_scope(
-		.clk(   hdmi_clk ),
-		.reset( reset ),
-		// video sync 
-		.blank( blank ), 
-		.hsync( hsync ),
-		.vsync( vsync ),
-		// scroll halt input
-		.halt ( mscroll_halt ),
-		// capture inputs
-		.ad_data( lcc_mon ),
-
-		.ad_strobe( mad_strobe ),
-		.ad_clk( clk ),
-		// video output
-		.red(   tinyb_red ),
-		.green( tinyb_green ),
-		.blue(  tinyb_blue )
-	);
+	//tiny_binary_scope #( 
+	//	.V_HEIGHT( 64 ), // 96 or 192 options
+	//	.V_START ( 400  ),
+	//	.H_START	( 529 ),
+	//	.H_END 	( 784 ),
+	//	.N       ( 2   ), // 60 Hz frames per col pel
+	//	.GD_COLOR( 24'h32006a /* smpte_deep_violet */ ), 
+	//	.BG_COLOR( 24'h00214c /* smpte_oxford_blue */ ) //24'h1d1d1d /* smpte_eerie_black */ )	
+	// ) _tinyb_scope(
+	//	.clk(   hdmi_clk ),
+	//	.reset( reset ),
+	//	// video sync 
+	//	.blank( blank ), 
+	//	.hsync( hsync ),
+	//	.vsync( vsync ),
+	//	// scroll halt input
+	//	.halt ( mscroll_halt ),
+	//	// capture inputs
+	//	.ad_data( lcc_mon ),
+	//
+	//	.ad_strobe( mad_strobe ),
+	//	.ad_clk( clk ),
+	//	// video output
+	//	.red(   tinyb_red ),
+	//	.green( tinyb_green ),
+	//	.blue(  tinyb_blue )
+	//);
 	assign tinyb = |{ tinyb_red, tinyb_green, tinyb_blue };	
 		
 	// 12 bit resistance number is 6.5. so 

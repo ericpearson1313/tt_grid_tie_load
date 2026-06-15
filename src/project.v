@@ -7,6 +7,13 @@
 `default_nettype none
 
 module tt_um_60hz_load(
+`ifdef __ALTERA_STD__
+	// MAx10 fpga probing
+    output reg [11:0] ac_acc,
+	 output reg [11:0] dc_acc,
+	 output reg ac_thresh,
+	 output reg dc_thresh,
+`endif
     input  wire [7:0] ui_in,    // Dedicated inputs
     output wire [7:0] uo_out,   // Dedicated outputs
     input  wire [7:0] uio_in,   // IOs: Input path
@@ -274,5 +281,16 @@ cos_rom[31] = 9'dx;
 
 	always @(posedge clk)
 		dc_th_gate <= !dc_fast_acc[30] & |dc_fast_acc[29-:6];
+		
+`ifdef __ALTERA_STD__
+    // Hook Up fpga probing
+	 always @(posedge clk) begin
+			ac_thresh <= th_gate;
+			dc_thresh <= dc_th_gate;
+			dc_acc <= dc_fast_acc[29-:12];
+			ac_acc <= fast_acc[24-:12];
+	end
+`endif
+
 
 endmodule
