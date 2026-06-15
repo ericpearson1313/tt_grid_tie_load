@@ -1,7 +1,7 @@
 // 128 column, 60 rows.  Even lines are ascii. Odd lines are color code, 0-F, <blank also 0>
 //-------------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|
-  LCC Analyzer 3MHZ 4CH 12BIT 32MByte 1.3s Trace Buf, 800x480x60hz WVGA
-  444444444444
+  GPC Grid Power Chip 48 Mhz Simulator
+  444444444444$$$$$$$
 
 
                                           
@@ -12,41 +12,41 @@
 
 
 
-                                                                                                                     1 sec/div
+                                          
 
-  Vcap* 6.4V/div 
+  Vdc* 6.4V/div 
  1111111111111111
 
 111
-  Iout  2.5A/div 
+  Vac  100V/div 
  2222222222222222
 
 222
-  Vcap  100V/div 
+  Vdc  100V/div 
  3333333333333333
 
 333
-  Vbat  5.6V/div 
+  AC Acc
  4444444444444444
 
 444
-  Vout  100V/div 
+  DC Acc
  5555555555555555
 
 555
- Est Iout  2.5A/div
+ Est Vref  100V/div
  6666666666666666666
 
 666
-  Vout* 6.4V/div
+  DC Acc (x16)
  7777777777777777
 
 777
-  Iout* 150mA/div
+  Vac*  6.4V/div
  88888888888888888
 
 888
-  Vbat* 350mV/div
+  AC Acc (x16)
  99999999999999999
                                        
 999
