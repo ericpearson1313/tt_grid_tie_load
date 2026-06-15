@@ -40,8 +40,8 @@ module cordic_sincos_50000_core_20 (
     // K � 0.607252935 ? 16-bit fixed � 19997, then sign-extend to 19 bits
     reg signed [15:0] K16;
 	initial K16  = 16'sd19997;
-    reg signed [IW-1:0] K;
-	initial K = {{(IW-16){K16[15]}}, K16};
+    wire signed [IW-1:0] K;
+	assign K = {{(IW-16){K16[15]}}, K16};
 
     // *** INTERNAL STATE: 19 BITS ***
     reg signed [IW-1:0] x, y, z;

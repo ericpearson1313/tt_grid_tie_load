@@ -173,6 +173,14 @@ module grid_tie_chip
     // PWM Generators
 	//////////////////////
 
+	// Test plan drives pgrid and vref setpoint.
+	logic signed [15:0] pgrid; // net power on our grid (gens - loads)
+	logic signed [11:0] vref;
+	
+	assign vref = 1744;	// 340 vdc
+	assign pgrid = 500; // aprox 100w
+	
+	
 	// Ratios drive by testbench
 	logic [15:0] num_vref, den_vref; // from system model
 	logic [15:0] num_sin , den_sin ;
@@ -181,8 +189,8 @@ module grid_tie_chip
 	logic [15:0] num_dc  , den_dc  ;
 
 	// Pwm signals
-	recip_pwm #( 16 ) i_pwm0 ( clk, reset, num_vref, den_vref, pwm_vref );
-	recip_pwm #( 16 ) i_pwm1 ( clk, reset, num_sin , den_sin , gain_sin );
+	recip_pwm #( 16 ) i_pwm0 ( clk, reset, num_vref, den_vref, pwm_vref  );
+	recip_pwm #( 16 ) i_pwm1 ( clk, reset, num_sin , den_sin , gain_sin  );
 	recip_pwm #( 16 ) i_pwm2 ( clk, reset, num_out , den_out , gain_out  );
 	recip_pwm #( 16 ) i_pwm3 ( clk, reset, num_ac  , den_ac  , gain_ac   );
 	recip_pwm #( 16 ) i_pwm4 ( clk, reset, num_dc  , den_dc  , gain_dc   );
@@ -197,8 +205,8 @@ module grid_tie_chip
 	assign den_ac   =  100;
 	assign num_dc   =  999;
 	assign den_dc   =  1000;
-	assign num_vref =  340;
-	assign den_vref =  400;	
+	assign num_vref =  vref;
+	assign den_vref =  2048;	
 	
 	// and the 6 adc pins, expanded to 12 bit adc channels
 	logic [11:0] mad_a0, mad_a1, mad_b0, mad_b1, iest;
@@ -231,8 +239,77 @@ module grid_tie_chip
 		.ad_in( { 12'h000, 12'h000, vac, vdc })
 	);	
 
+	//////////////////////
+    // Cordic to drive AC
+	//////////////////////
+
+	// Driven by difference from target voltage to get some reactivity on AC. 
+	reg signed [15:0] phase_lead; // 50000 steps per cycle, typical 1000 = 2% lead
+	always @(posedge clk) 
+		phase_lead  <= ( vdc - vref ) * int'(( 12500.0 / 90.0 ) * ( 90.0 / 340.0 ) * ( 340.0 / 1744.0 )); // 340v error is 90 degrees phase shift	
+		
+	// Otherwise this feeds the 
+   reg signed [15:0] angle;
+   wire [15:0] sin_out, cos_out;
+   wire valid, busy;
+	wire [11:0] cos3x;
+
+	always @(posedge clk) begin
+		if( reset ) begin
+			angle <= -12500;
+		end else if ( adc_cs ) begin
+			angle <= ( angle == 12499 ) ? -12500 : angle + 1;
+		end
+	end
+
+    wire signed [15:0] angle_ofs;
+    wire signed [15:0] angle_new;
+
+	assign angle_ofs = angle + phase_lead;
+	assign angle_new = ( angle_ofs > 12499 ) ? angle_ofs - 25000 :
+                       ( angle_ofs < -12500) ? angle_ofs + 25000 : angle_ofs;
+
+	reg polarity;
+	always @(posedge clk) begin
+		if( reset ) begin
+			polarity <= 0;
+		end else if ( adc_cs ) begin
+			polarity <= ( angle_new == 12499 ) ? !polarity : polarity;
+		end
+	end
+
+    cordic_sincos_50000_core_20 i_tb_sin(
+        .clk( clk ),
+        .rst( reset ),
+        .start( adc_cs ),
+        .angle_in( angle_new ),
+        .sin_out ( ),
+        .cos_out ( cos_out ),
+        .valid( ),
+        .busy( )
+    );
+
+	wire [15:0] cos_pol;
+	assign cos_pol = ( polarity ) ? ~cos_out : cos_out;
+	assign cos3x = cos_pol[15-:12] + { cos_pol[15], cos_pol[15-:11] };
+
+	assign vac = cos3x;
 
 
+	
+   // Plant Model 48Mhz
+	dclink_model i_dclink (
+		.clk	( clk ),
+		.reset 	( reset ),
+		// Model Inputs
+		.pnet		( pgrid ),  // input Grid net power (gens-loads)
+		.pwm		( pwm_dump ),	// Dump PWM
+		// Model Outputs
+		.vdc		( vdc ), 	// DC Link Voltage
+	);
+
+	
+	
 	// Energy accumulator Display
 	logic [7:0] pwr_str;
 	//string_overlay #(.LEN(8)) _pwr4 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d100),.y('d3), .out( pwr_str[4] ), .str("Out J 0x") );
