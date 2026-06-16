@@ -239,7 +239,7 @@ cos_rom[31] = 9'dx;
 		if( reset ) begin
 			fast_acc <= 0;
 		end else begin
-			fast_acc <= ( next_acc[25] != next_acc[24] ) ? {{2{next_acc[25]}}, {25{~next_acc[25]}}} : next_acc;
+			fast_acc <= ( next_acc[25] != next_acc[24] ) ? {{2{next_acc[25]}}, {24{~next_acc[25]}}} : next_acc;
 		end
 	end
 
