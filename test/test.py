@@ -63,7 +63,7 @@ async def test_project(dut):
 
     # Test if Vdc is under control
     assert int(dut.vdc.value) < 1570
-    assert int(dut.vdc.value) > 150
+    assert int(dut.vdc.value) > 1530
 
     # Keep testing the module by changing the input values, waiting for
     # one or more clock cycles, and asserting the expected output values.
