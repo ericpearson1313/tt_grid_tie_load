@@ -138,6 +138,7 @@ module grid_tie_chip
       .rst_n  (!reset),     // not reset      .ui_in  (ui_in),    // Dedicated inputs
 		// Tiny Tapeout IO
       .uo_out (uo_out),   // Dedicated outputs
+		.ui_in  (ui_in),	  // Dedicated Inputs
       .uio_in (uio_in),   // IOs: Input path
       .uio_out(uio_out),  // IOs: Output path
       .uio_oe (uio_oe),   // IOs: Enable path (active high: 0=input, 1=output)
@@ -161,9 +162,9 @@ module grid_tie_chip
   assign ui_in[6] = gain_dc;
   assign ui_in[7] = 1'b1; // AC mode 1/4 cycle
   
-  assign pwm_sin_p = uo_out[2];
-  assign pwm_sin_n = uo_out[3];
-  assign pwm_dump  = uo_out[4];
+  assign pwm_sin_p = uo_out[1];
+  assign pwm_sin_n = uo_out[2];
+  assign pwm_dump  = uo_out[3];
 
   // ADC simulated IO
   logic adc_cs, adc_sdata_vac, adc_sdata_vdc;
@@ -172,7 +173,8 @@ module grid_tie_chip
   assign ui_in[0] = adc_sdata_vac;
   assign ui_in[1] = adc_sdata_vdc;
   
-
+	assign uio_in = 8'h00;
+  
 	/////////////////////////////////
 	/////////////////////////////////
 	////
@@ -190,8 +192,8 @@ module grid_tie_chip
 	logic signed [15:0] pgrid; // net power on our grid (gens - loads)
 	logic signed [11:0] vref;
 	
-	assign vref = 1744;	// 340 vdc
-	assign pgrid = 500; // aprox 100w
+	assign vref = 1544;	// 340 vdc
+	assign pgrid = 454;  // aprox 100w
 	
 	
 	// Ratios drive by testbench
@@ -210,14 +212,14 @@ module grid_tie_chip
 	
 	assign ac_mode = 1'b1;
 
-	assign num_sin  =  99;
-	assign den_sin  =  100;
-	assign num_out  =  99;
-	assign den_out  =  100;
-	assign num_ac   =  25;
-	assign den_ac   =  100;
-	assign num_dc   =  999;
-	assign den_dc   =  1000;
+	assign num_sin  =  95;
+	assign den_sin  =  97;
+	assign num_out  =  96;
+	assign den_out  =  97;
+	assign num_ac   =  24;
+	assign den_ac   =  97;
+	assign num_dc   =  93;
+	assign den_dc   =  97;
 	assign num_vref =  vref;
 	assign den_vref =  2048;	
 	
@@ -232,7 +234,7 @@ module grid_tie_chip
 		.ad_cs( adc_cs ),
 		.ad_out( {unused[0], unused[1], adc_sdata_vdc, adc_sdata_vac } ),
 		// simualted ADC Data for Tester
-		.ad_in( { 12'h000, 12'h000, vac, vdc })
+		.ad_in( { 12'h000, 12'h000, vdc, vac })
 	);	
 
 	// Connect up to capture buffer(S) and HDMI Display
@@ -247,9 +249,11 @@ module grid_tie_chip
 							gain_sin ,
 							gain_out ,
 							gain_ac  , 
-							gain_dc  };	
+							gain_dc  
+							};	
 							
-		// and the 6 adc pins, expanded to 12 bit adc channels
+		
+	// and the 6 adc pins, expanded to 12 bit adc channels
 	logic [11:0] mad_a0, mad_a1, mad_b0, mad_b1, iest;
 	logic mad_strobe;	
 	
@@ -268,7 +272,7 @@ module grid_tie_chip
 	// Driven by difference from target voltage to get some reactivity on AC. 
 	reg signed [15:0] phase_lead; // 50000 steps per cycle, typical 1000 = 2% lead
 	always @(posedge clk) 
-		phase_lead  <= ( vdc - vref ) * int'(( 12500.0 / 90.0 ) * ( 90.0 / 340.0 ) * ( 340.0 / 1744.0 )); // 340v error is 90 degrees phase shift	
+		phase_lead  <= ( vdc - vref ) * int'(( 12500.0 / 90.0 ) * ( 90.0 / 340.0 ) * ( 340.0 / 1544.0 )); // 340v error is 90 degrees phase shift	
 		
 	// Otherwise this feeds the 
    reg signed [15:0] angle;
@@ -292,11 +296,15 @@ module grid_tie_chip
                        ( angle_ofs < -12500) ? angle_ofs + 25000 : angle_ofs;
 
 	reg polarity;
+	reg signed [15:0] angle_prev;
 	always @(posedge clk) begin
 		if( reset ) begin
-			polarity <= 0;
+			polarity <= 1;
+			angle_prev <= -12500;
 		end else if ( adc_cs ) begin
-			polarity <= ( angle_new == 12499 ) ? !polarity : polarity;
+			angle_prev <= angle_new;
+			polarity <= ( angle_prev[15-:4] == 4'b0011 && angle_new[15-:4] == 4'b1100 ) ? !polarity :
+						   ( angle_prev[15-:4] == 4'b1100 && angle_new[15-:4] == 4'b0011 ) ? !polarity : polarity;
 		end
 	end
 
@@ -894,25 +902,38 @@ module grid_tie_chip
 	
 	// Port Names
 	logic [3:0] in_str;
-   //string_overlay #(.LEN(2)) _in0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h48),.y('h01), .out( in_str[0]), .str("A0") );
-	//string_overlay #(.LEN(2)) _in1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h48),.y('h03), .out( in_str[1]), .str("A1") );
-	//string_overlay #(.LEN(2)) _in2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h48),.y('h05), .out( in_str[2]), .str("B0") );
-	//string_overlay #(.LEN(2)) _in3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h48),.y('h07), .out( in_str[3]), .str("B1") );
+   string_overlay #(.LEN(3)) _in0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h01), .out( in_str[0]), .str("VAC") );
+	string_overlay #(.LEN(3)) _in1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h03), .out( in_str[1]), .str("VDC") );
+	string_overlay #(.LEN(3)) _in2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h05), .out( in_str[2]), .str("SAC") );
+	string_overlay #(.LEN(3)) _in3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h07), .out( in_str[3]), .str("SDC") );
 	
 	// 12bit hex overlays(4)
 	logic [3:0] hex_str;
-	//hex_overlay #(.LEN(3)) _hex0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h01), .out( hex_str[0]), .in( value_1 ) );
-	//hex_overlay #(.LEN(3)) _hex1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h03), .out( hex_str[1]), .in( value_2 ) );
-	//hex_overlay #(.LEN(3)) _hex2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h05), .out( hex_str[2]), .in( value_3 ) );
-	//hex_overlay #(.LEN(3)) _hex3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h07), .out( hex_str[3]), .in( value_4 ) );
+	hex_overlay #(.LEN(3)) _hex0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h01), .out( hex_str[0]), .in( value_1 ) );
+	hex_overlay #(.LEN(3)) _hex1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h03), .out( hex_str[1]), .in( value_2 ) );
+	hex_overlay #(.LEN(3)) _hex2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h05), .out( hex_str[2]), .in( value_3 ) );
+	hex_overlay #(.LEN(3)) _hex3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h07), .out( hex_str[3]), .in( value_4 ) );
 					
 	// dump binary	values	
 	logic [3:0] bin_str;
-	//bin_overlay #(.LEN(12)) _bin0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h4B), .y('h01), .out( bin_str[0] ), .in( value_1 ) );
-	//bin_overlay #(.LEN(12)) _bin1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h4B), .y('h03), .out( bin_str[1] ), .in( value_2 ) );
-	//bin_overlay #(.LEN(12)) _bin2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h4B), .y('h05), .out( bin_str[2] ), .in( value_3 ) );
-	//bin_overlay #(.LEN(12)) _bin3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h4B), .y('h07), .out( bin_str[3] ), .in( value_4 ) );
+	bin_overlay #(.LEN(12)) _bin0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h50), .y('h01), .out( bin_str[0] ), .in( value_1 ) );
+	bin_overlay #(.LEN(12)) _bin1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h50), .y('h03), .out( bin_str[1] ), .in( value_2 ) );
+	bin_overlay #(.LEN(12)) _bin2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h50), .y('h05), .out( bin_str[2] ), .in( value_3 ) );
+	bin_overlay #(.LEN(12)) _bin3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h50), .y('h07), .out( bin_str[3] ), .in( value_4 ) );
 
+   // Text legend
+   logic [7:0] leg_str;
+   string_overlay #(.LEN(8)) i_leg00 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+0), .out( leg_str[0] ), .str("Gain DC ") );
+   string_overlay #(.LEN(8)) i_leg01 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+1), .out( leg_str[1] ), .str("Gain AC ") );
+   string_overlay #(.LEN(8)) i_leg02 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+2), .out( leg_str[2] ), .str("Gain Out") );
+   string_overlay #(.LEN(8)) i_leg03 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+3), .out( leg_str[3] ), .str("Gain_Sin") );
+   string_overlay #(.LEN(8)) i_leg04 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+4), .out( leg_str[4] ), .str("Pwm_Vref") );
+   string_overlay #(.LEN(8)) i_leg05 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+5), .out( leg_str[5] ), .str("Pwm_Dump") );
+   string_overlay #(.LEN(8)) i_leg06 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+6), .out( leg_str[6] ), .str("ACthresh") );
+   string_overlay #(.LEN(8)) i_leg07 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+7), .out( leg_str[7] ), .str("DCthresh") );
+
+	
+	
 	// Merge overlays
 	logic overlay;
 	assign overlay = (|bin_str ) |
@@ -922,6 +943,7 @@ module grid_tie_chip
 						  ( text_ovl && text_color == 0 ) | // normal text
 						  ( key_strg) |
 						  (|res_str ) |
+						  (|leg_str ) |						  
 						  (|id_str  ) ;
 	
 
