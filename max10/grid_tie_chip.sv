@@ -155,11 +155,12 @@ module grid_tie_chip
   logic pwm_vref, gain_sin, gain_out, gain_ac, gain_dc; // Inputs
   logic ac_mode;
   
-  assign ui_in[2] = pwm_vref;
-  assign ui_in[3] = gain_sin;
-  assign ui_in[4] = gain_out;
-  assign ui_in[5] = gain_ac;
-  assign ui_in[6] = gain_dc;
+
+  assign ui_in[2] = gain_sin;
+  assign ui_in[3] = gain_out;
+  assign ui_in[4] = gain_ac;
+  assign ui_in[5] = gain_dc;
+  assign ui_in[6] = pwm_vref;
   assign ui_in[7] = 1'b1; // AC mode 1/4 cycle
   
   assign pwm_sin_p = uo_out[1];
@@ -193,7 +194,7 @@ module grid_tie_chip
 	logic signed [11:0] vref;
 	
 	assign vref = 1544;	// 340 vdc
-	assign pgrid = 454;  // aprox 100w
+
 	
 	
 	// Ratios drive by testbench
@@ -223,19 +224,35 @@ module grid_tie_chip
 	assign num_vref =  vref;
 	assign den_vref =  2048;	
 	
-	// Simualte an external ADC
-	logic signed [11:0] vdc, vac;
-	logic [1:0] unused;
-	adcsim  i_adcsim (
-		// Input clock
-		.clk( clk ),
-		.reset( reset ),
-		// External A/D interface
-		.ad_cs( adc_cs ),
-		.ad_out( {unused[0], unused[1], adc_sdata_vdc, adc_sdata_vac } ),
-		// simualted ADC Data for Tester
-		.ad_in( { 12'h000, 12'h000, vdc, vac })
-	);	
+    // AD7352 Model     
+
+
+    // sim pad register of CS
+    logic cs_ireg;
+    always @(posedge !clk)
+        cs_ireg <= ( reset ) ? 0 : uo_out[0];
+
+    // synthesisiable ADC models to feed system data into LCC
+	 logic signed [11:0] vac, vdc;
+    logic [3:0] m_ad_out;
+    adcsim i_adcsim(
+        .clk( !clk  ),
+        .reset( reset ),
+        .ad_in( { 12'd0, 12'd0, vdc, vac } ),
+        .ad_out( m_ad_out[3:0] ),
+        .ad_cs( cs_ireg )
+    );
+
+    // sim out pad output reg for data
+    always_ff @(posedge !clk) begin
+      if( reset ) begin
+        adc_sdata_vac <= 0;
+        adc_sdata_vdc <= 0;
+      end else begin
+        adc_sdata_vac <= m_ad_out[0];
+        adc_sdata_vdc <= m_ad_out[1];
+      end
+    end
 
 	// Connect up to capture buffer(S) and HDMI Display
 
@@ -404,12 +421,19 @@ module grid_tie_chip
 	logic m_cap_halt;
 	logic m_pwm;
 
+	assign m_pwm = 0;
+	assign burn = 0;
+	assign m_cap_halt = 1;
 	
 	always @(posedge clk) begin
 		if( reset ) begin
 			zoom <= 0;
 			zoom_button <= 0;
 			key_del <= 0;
+			base_addr <= 0;
+			burn_addr <= 0;
+			pwm_del <= 0;
+			retrigger <= 0;
 		end else begin
 			key_del <= key[4];
 			pwm_del <= m_pwm;
@@ -565,7 +589,8 @@ module grid_tie_chip
 			awaddr <= 25'b0;
 			awvalid <= 0;
 		end else begin
-			if( m_cap_halt && awaddr[24:4] == (base_addr[24:4] - 16384) ) begin // approx 10 ms before start
+			//if( m_cap_halt && awaddr[24:4] == (base_addr[24:4] - 16384) ) begin // approx 10 ms before start
+			if( awaddr[24:4] == 21'h1FFFFF ) begin
 				awvalid <= 0;
 				awaddr <= awaddr;
 			end else begin
@@ -574,6 +599,8 @@ module grid_tie_chip
 			end
 		end
 	end
+	
+	assign pgrid = awaddr[24:23] * 454 + 454;  // aprox 100w per 1/4 sec
 	
 	/////////////////////////////////
 	////
@@ -757,10 +784,10 @@ module grid_tie_chip
 			avg     <= 0;
 		end else begin
 			if( mad_strobe ) begin
-				acc[0] <= ( acc_cnt == 0 ) ? { 22'h00_0000, mad_a0[11:0] } : acc[0] + { 22'h00_0000, mad_a0[11:0] };
-				acc[1] <= ( acc_cnt == 0 ) ? { 22'h00_0000, mad_a1[11:0] } : acc[1] + { 22'h00_0000, mad_a1[11:0] };
-				acc[2] <= ( acc_cnt == 0 ) ? { 22'h00_0000, mad_b0[11:0] } : acc[2] + { 22'h00_0000, mad_b0[11:0] };
-				acc[3] <= ( acc_cnt == 0 ) ? { 22'h00_0000, mad_b1[11:0] } : acc[3] + { 22'h00_0000, mad_b1[11:0] };
+				acc[0] <= ( acc_cnt == 0 ) ? { 22'h00_0000, 12'h7ff^mad_a0[11:0] } : acc[0] + { 22'h00_0000, 12'h7ff^mad_a0[11:0] };
+				acc[1] <= ( acc_cnt == 0 ) ? { 22'h00_0000, 12'h7ff^mad_a1[11:0] } : acc[1] + { 22'h00_0000, 12'h7ff^mad_a1[11:0] };
+				acc[2] <= ( acc_cnt == 0 ) ? { 22'h00_0000, 12'h7ff^mad_b0[11:0] } : acc[2] + { 22'h00_0000, 12'h7ff^mad_b0[11:0] };
+				acc[3] <= ( acc_cnt == 0 ) ? { 22'h00_0000, 12'h7ff^mad_b1[11:0] } : acc[3] + { 22'h00_0000, 12'h7ff^mad_b1[11:0] };
 				if( acc_cnt == 0 ) begin
 					avg[0] <= acc[0][33-:12];
 					avg[1] <= acc[1][33-:12];
