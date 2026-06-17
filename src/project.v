@@ -267,12 +267,14 @@ cos_rom[31] = 9'dx;
 		if( reset ) begin
 			dc_fast_acc <= 0;
 		end else begin
-			dc_fast_acc <= ( dc_next_acc[30] != dc_next_acc[29] ) ? {{2{dc_next_acc[30]}}, {29{~dc_next_acc[30]}}} : dc_next_acc;
+			//dc_fast_acc <= ( dc_next_acc[30] != dc_next_acc[29] ) ? {{2{dc_next_acc[30]}}, {29{~dc_next_acc[30]}}} : dc_next_acc;
+			dc_fast_acc <= ( !dc_next_acc[30] &&    dc_next_acc[29]    ) ? 31'h1FFFFFFF : 
+			               (  dc_next_acc[30] && !(&dc_next_acc[29-:6])) ? 31'h7F000000 : dc_next_acc;
 		end
 	end
 
 	always @(posedge clk)
-		dc_very_low <= ( reset ) ? 1'b1 : ( !dc_very_low && dc_fast_acc[30] && !dc_fast_acc[28] ) ? 1'b1 : 
+		dc_very_low <= ( reset ) ? 1'b1 : ( !dc_very_low && dc_next_acc[30] && !(&dc_next_acc[29-:6])) ? 1'b1 : 
                                           (  dc_very_low && dc_th_gate ) ? 1'b0 : dc_very_low ;
 
 	// Low pass filter u : TBD
