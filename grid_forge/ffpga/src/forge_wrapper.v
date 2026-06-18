@@ -104,8 +104,8 @@
 	assign ui_in[3] = gain_ac;
 	assign ui_in[4] = gain_dc;
 	assign ui_in[5] = gain_out;
-	assign ui_in[6] = 0;
-	assign ui_in[7] = 0;
+	assign ui_in[6] = pwm_vref;
+	assign ui_in[7] = 1'b1;
 	
 	// Connect up outputs
 	assign ad_cs 		= uo_out[0];
