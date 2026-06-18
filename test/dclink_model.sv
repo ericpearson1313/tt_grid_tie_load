@@ -35,11 +35,11 @@
 	
 	always @(negedge clk) begin
 		if( reset ) begin
-			vcap = 0;
-			pdump = 0;	
+			vcap <= 0;
+			pdump <= 0;	
 		end else begin
-			pdump = ( !pwm ) ? 0 : ((vcap[36-:11] * vcap[36-:11] ) >> 6) ; // 340/1544/12.8 ~= 1/64 for R = 12.8 ohms-ish. 
-			vcap  = ( next_vcap[37] ) ? 0 : ( next_vcap[36-:11] > 2000 ) ? { 12'd2000, 26'h000_0000 } : next_vcap;
+			pdump <= ( !pwm ) ? 0 : ((vcap[36-:11] * vcap[36-:11] ) >> 6) ; // 340/1544/12.8 ~= 1/64 for R = 12.8 ohms-ish. 
+			vcap  <= ( next_vcap[37] ) ? 0 : ( next_vcap[36-:11] > 2000 ) ? { 12'd2000, 26'h000_0000 } : next_vcap;
 		end
 	end
 			
