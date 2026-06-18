@@ -188,24 +188,26 @@ module grid_tie_chip
 	
 
 	//////////////////////
-    // PWM Generators
+    // Test Inputs
 	//////////////////////
 
-	// Test plan drives pgrid and vref setpoint.
+	// Test plan drives pgrid
 	logic signed [15:0] pgrid; // net power on our grid (gens - loads)
-	logic signed [11:0] vref;
 	
-	assign vref = 1544;	// 340 vdc
+	// Test Plan drives vref
+	logic signed [15:0] vref;
 
-	
-	
-	// Ratios drive by testbench
+	// Test plan drives PWM inputs
 	logic [15:0] num_vref, den_vref; // from system model
 	logic [15:0] num_sin , den_sin ;
 	logic [15:0] num_out , den_out ;
 	logic [15:0] num_ac  , den_ac  ;
 	logic [15:0] num_dc  , den_dc  ;
 
+	//////////////////////
+    // PWM Generators
+	//////////////////////
+	
 	// Pwm signals
 	recip_pwm #( 16 ) i_pwm0 ( clk, reset, num_vref, den_vref, pwm_vref  );
 	recip_pwm #( 16 ) i_pwm1 ( clk, reset, num_sin , den_sin , gain_sin  );
@@ -213,21 +215,9 @@ module grid_tie_chip
 	recip_pwm #( 16 ) i_pwm3 ( clk, reset, num_ac  , den_ac  , gain_ac   );
 	recip_pwm #( 16 ) i_pwm4 ( clk, reset, num_dc  , den_dc  , gain_dc   );
 	
-	assign ac_mode = 1'b1;
-
-	assign num_sin  =  95;
-	assign den_sin  =  97;
-	assign num_out  =  96;
-	assign den_out  =  97;
-	assign num_ac   =  24;
-	assign den_ac   =  97;
-	assign num_dc   =  93;
-	assign den_dc   =  97;
-	assign num_vref =  vref;
-	assign den_vref =  2048;	
-	
+	//////////////////////
     // AD7352 Model     
-
+	//////////////////////
 
     // sim pad register of CS
     logic cs_ireg;
@@ -256,37 +246,10 @@ module grid_tie_chip
       end
     end
 
-	// Connect up to capture buffer(S) and HDMI Display
 
-	// monitor LCC digital I/O pins
-	logic [7:0] lcc_mon;
-	assign lcc_mon = { 
-							dc_thresh, 
-							ac_thresh,
-							pwm_dump ,
-							pwm_vref ,
-							gain_sin ,
-							gain_out ,
-							gain_ac  , 
-							gain_dc  
-							};	
-							
-		
-	// and the 6 adc pins, expanded to 12 bit adc channels
-	logic [11:0] mad_a0, mad_a1, mad_b0, mad_b1, iest;
-	logic mad_strobe;	
-	
-	assign mad_strobe = adc_cs;
-	assign mad_a0 = 12'h7ff ^ vac;
-	assign mad_a1 = 12'h7ff ^ vdc;
-	assign mad_b0 = 12'h7ff ^ ac_acc;
-	assign mad_b1 = 12'h7ff ^ dc_acc;
-	assign iest   = 12'h7ff ^ vref;
-							
-
-	//////////////////////
-    // Cordic to drive AC
-	//////////////////////
+	////////////////////////
+    // Cordic to drive vac
+	////////////////////////
 
 	// Driven by difference from target voltage to get some reactivity on AC. 
 	reg signed [15:0] phase_lead; // 50000 steps per cycle, typical 1000 = 2% lead
@@ -343,8 +306,10 @@ module grid_tie_chip
 	assign cos3x = cos_pol[15-:12] + { cos_pol[15], cos_pol[15-:11] };
 
 	assign vac = cos3x;
-
-
+	
+	//////////////////////
+    // DCLink vdc model
+	//////////////////////
 	
    // Plant Model 48Mhz
 	dclink_model i_dclink (
@@ -357,7 +322,102 @@ module grid_tie_chip
 		.vdc		( vdc ), 	// DC Link Voltage
 	);
 
+	/////////////////////////////////
+	////
+	////       TEST Inputs
+	////
+	/////////////////////////////////
 	
+	logic [2:0] tidx; // driven by test bench
+	logic signed [11:0] eprobe; // driven by test.
+	
+`define TEST_2
+`ifdef TEST_1 // Simple steps in power
+	// Set Vref 
+	assign vref = 1544; // 340 V
+	// Assign grid power
+	always @(posedge clk) 
+		pgrid <= ( tidx == 0 ) ? 2 * 454 :  // aprox 100w per 1/4 sec
+		         ( tidx == 1 ) ? 4 * 454 :  // 000 W
+		         ( tidx == 2 ) ? 1 * 454 :  // 000 W
+		         ( tidx == 3 ) ? 2 * 454 :  // 100 W
+		         ( tidx == 4 ) ? 4 * 454 :  // 200 W
+		         ( tidx == 5 ) ? 8 * 454 :  // 400 W
+		         ( tidx == 6 ) ? 16 * 454 :  // 800 W
+		         ( tidx == 7 ) ? 32 * 454 :0;// 000 W
+	// Assign PWM input ratios
+	assign num_sin  =  71; 	assign den_sin  =   73; 
+	assign num_out  =  97;	assign den_out  =  101;
+	assign num_ac   =  25; 	assign den_ac   =  199; // 1/8
+	assign num_dc   =  25;	assign den_dc   =   97;	// 1/4 
+	assign num_vref =vref;	assign den_vref = 2048;
+	// Connect up Probe
+	always @(posedge clk)
+		eprobe <= { 1'b0, pgrid[14-:11] };
+`endif
+`ifdef TEST_2 // test effect of DC Gain 
+	// Set Vref 
+	assign vref = 1544; // 340 V
+	// Assign grid power
+	assign pgrid = 8 * 454; //800W
+	// Time varing DC gain
+	assign den_dc   =   97;	// 1/4 
+	always @(posedge clk) 
+		num_dc <= ( tidx == 0 ) ? 25 :  // startup on gain 1/4
+		          ( tidx == 1 ) ? 30 :  // 
+		          ( tidx == 2 ) ? 40 :  // 
+		          ( tidx == 3 ) ? 50 :  // 1/2
+		          ( tidx == 4 ) ? 60 :  // 
+		          ( tidx == 5 ) ? 70 :  // 3/4
+		          ( tidx == 6 ) ? 20 :  // 
+		          ( tidx == 7 ) ? 10 :0;// 
+	// Assign PWM input ratios
+	assign num_sin  =  71; 	assign den_sin  =   73; 
+	assign num_out  =  97;	assign den_out  =  101;
+	assign num_ac   =  25; 	assign den_ac   =  199; // 1/8
+	//assign num_dc   =  25;	assign den_dc   =   97;	// 1/4 
+	assign num_vref =vref;	assign den_vref = 2048;
+	// Connect up Probe
+	always @(posedge clk)
+		eprobe <= { 1'b0, num_dc[6:0], 4'b0000 };
+`endif
+
+
+	//////////////////////////////
+   // SIM to VID connections
+	//////////////////////////////
+
+	// monitor LCC digital I/O pins
+	logic [7:0] lcc_mon;
+	assign lcc_mon = { 
+							dc_thresh, 
+							ac_thresh,
+							pwm_dump ,
+							pwm_vref ,
+							gain_sin ,
+							gain_out ,
+							gain_ac  , 
+							gain_dc  
+							};	
+							
+		
+	// and the 6 adc pins, expanded to 12 bit adc channels
+	logic [11:0] mad_a0, mad_a1, mad_b0, mad_b1, iest;
+	logic mad_strobe;	
+	assign mad_strobe = adc_cs;
+	assign mad_a0 = 12'h7ff ^ vac;
+	assign mad_a1 = 12'h7ff ^ vdc;
+	assign mad_b0 = 12'h7ff ^ ac_acc;
+	assign mad_b1 = 12'h7ff ^ dc_acc;
+	assign iest   = 12'h7ff ^ eprobe;
+							
+
+	/////////////////////////////////
+	////
+	////       FPGA System
+	////
+	/////////////////////////////////	
+
 	
 	// Energy accumulator Display
 	logic [7:0] pwr_str;
@@ -601,17 +661,8 @@ module grid_tie_chip
 			end
 		end
 	end
-	
-	always @(posedge clk) 
-		pgrid <= ( awaddr[24:22] == 0 ) ? 2 * 454 :  // aprox 100w per 1/4 sec
-		         ( awaddr[24:22] == 1 ) ? 4 * 454 :  // 000 W
-		         ( awaddr[24:22] == 2 ) ? 1 * 454 :  // 000 W
-		         ( awaddr[24:22] == 3 ) ? 2 * 454 :  // 100 W
-		         ( awaddr[24:22] == 4 ) ? 4 * 454 :  // 200 W
-		         ( awaddr[24:22] == 5 ) ? 8 * 454 :  // 400 W
-		         ( awaddr[24:22] == 6 ) ? 16 * 454 :  // 800 W
-		         ( awaddr[24:22] == 7 ) ? 32 * 454 :0;// 000 W
-					
+		
+	assign tidx = awaddr[24:22]; // test index based on write address, 1/8th buffer per step.
 	
 	/////////////////////////////////
 	////
