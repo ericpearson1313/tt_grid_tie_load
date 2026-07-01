@@ -2,11 +2,20 @@
 
 *A TinyTapeout ASIC for grid‑aware AC generation and power balancing*
 
-This ASIC implements a **self‑contained, grid‑aware control loop** capable of generating a clean 60 Hz reference waveform while simultaneously regulating real‑power flow using a **DC‑link dump load**. It is designed for small AC micro‑systems where PV inverters, a low‑power grid‑former, and a resistive dump load must coexist without external controllers.
+This ASIC implements a self‑contained, grid‑aware control loop capable of generating 
+a clean 60 Hz reference waveform while simultaneously regulating real‑power flow using a DC‑link dump load. It is designed 
+for small AC micro‑systems where PV inverters, a low‑power grid‑former, and a resistive dump load must coexist without external controllers.
 
-The chip senses the AC and DC waveforms, compares DC to a Vref and AC to an internal CORDIC‑generated reference, and adjusts a DC‑side dump FET to maintain long‑term phase and amplitude stability. All control is performed on‑chip using add/shift arithmetic, a fast error accumulator, a slow IIR loop, and a minimum‑pulse‑width PWM engine.
-
+Chip Block Diagram
 ![Block Diagram](block_diagram.png)
+
+The chip senses the AC and DC waveforms, compares DC to a Vref and AC to an internal CORDIC‑generated reference, 
+and adjusts a DC‑side dump FET to maintain long‑term phase and amplitude stability. 
+All control is performed on‑chip using add/shift arithmetic, a fast error accumulator, 
+a slow IIR loop, and a minimum‑pulse‑width PWM engine.
+
+Chip context in development system
+![Development system](dev_sys.png)
 
 \---
 ## **Core Features**
@@ -18,7 +27,7 @@ Samples the AC and DC waveforms at 3 MHz and compares it to the internal refer
 * **AC/DC Dual Loop control**  
 Forms linear and stable control loops without multipliers.
 * **DC‑link dump‑load PWM output**  
-Drives a single high‑voltage FET with enforced **4 µs minimum ON/OFF** times.
+Drives a single high‑voltage FET with enforced 4 µs minimum ON/OFF times.
 * **Four real‑time tuning gates**  
 External PWM or logic‑level inputs adjust loop behavior on the fly:
 
@@ -28,8 +37,9 @@ External PWM or logic‑level inputs adjust loop behavior on the fly:
   * `gain_ac` — AC gain
   * `gain_dc` — DC gain
   * `mode_ac` — select 1/4 cycle AC operation
-* **Safe, simple power topology**  
-Intended for use with a **rectified 240 V AC DC‑link** (VFD‑style front end) and a resistive dump load such as a water heater.
+  * Safe, simple power topology  
+  
+Intended for use with a rectified 240 V AC DC‑link (VFD‑style front end) and a resistive dump load such as a water heater.
 
 ![System Diagram](system_diagram.png)
 
